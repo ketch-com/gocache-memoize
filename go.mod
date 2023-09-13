@@ -1,4 +1,4 @@
-module go.ketch.com/lib/gocache-memoize
+module github.com/ketch-com/gocache-memoize
 
 go 1.20
 

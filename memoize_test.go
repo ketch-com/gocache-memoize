@@ -4,7 +4,7 @@ import (
 	"context"
 	"github.com/eko/gocache/lib/v4/cache"
 	"github.com/eko/gocache/lib/v4/store"
-	memoize "go.ketch.com/lib/gocache-memoize"
+	memoize "github.com/ketch-com/gocache-memoize"
 	"testing"
 	"time"
 )
