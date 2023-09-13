@@ -1,0 +1,62 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      version-major: ${{ steps.version.outputs.version-major-only }}
+      version-minor: ${{ format('{0}.{1}', steps.version.outputs.version-major-only, steps.version.outputs.version-minor-only) }}
+      version-patch: ${{ format('{0}.{1}.{2}', steps.version.outputs.version-major-only, steps.version.outputs.version-minor-only, steps.version.outputs.version-patch-only) }}
+    permissions:
+      contents: read
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+    - name: Generate next version
+      id: version
+      uses: conventional-actions/next-version@v1
+    - name: Setup .netrc
+      uses: conventional-actions/setup-netrc@v1
+    - name: Setup Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: "1.20"
+        cache: true
+    - name: Build Go code
+      uses: conventional-actions/go-build@v1
+      with:
+        platforms: |
+          linux/amd64
+          linux/arm64
+
+  release:
+    name: Release
+    if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    needs:
+    - build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+    - name: Create Release
+      id: release
+      uses: conventional-actions/create-release@v1
+      with:
+        tag_name: ${{ needs.build.outputs.version }}
+        artifacts: '*'
+
+concurrency:
+  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.ref }}

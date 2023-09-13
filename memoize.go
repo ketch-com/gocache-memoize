@@ -2,7 +2,9 @@ package memoize
 
 import (
 	"context"
+	"errors"
 	"github.com/eko/gocache/lib/v4/cache"
+	"github.com/eko/gocache/lib/v4/store"
 	"golang.org/x/sync/singleflight"
 )
 
@@ -20,31 +22,34 @@ func NewMemoizer[T any](cache *cache.Cache[T]) *Memoizer[T] {
 }
 
 // Memoize returns the last value of the function fn when called with the given key. If not available in the
-// cache, then the function is called and it's result is cached.
-func (m *Memoizer[T]) Memoize(ctx context.Context, key string, fn func(context.Context) (T, error)) (value T, err error) {
-	// Check cache
-	value, err = m.Get(ctx, key)
-	if err != nil {
-		return
+// cache, then the function is called and its result is cached.
+func (m *Memoizer[T]) Memoize(ctx context.Context, key string, fn func(context.Context) (T, error)) (T, error) {
+	value, err := m.Get(ctx, key)
+	if err == nil {
+		return value, nil
+	} else if !errors.Is(err, store.NotFound{}) {
+		return *new(T), err
 	}
 
-	var data any
-	data, err, _ = m.group.Do(key, func() (any, error) {
-		value, err := fn(ctx)
+	data, err, _ := m.group.Do(key, func() (any, error) {
+		v, err := fn(ctx)
 		if err != nil {
-			m.Set(ctx, key, value)
+			return nil, err
 		}
 
-		return value, err
+		if err := m.Set(ctx, key, v); err != nil {
+			return nil, err
+		}
+
+		return v, nil
 	})
 	if err != nil {
-		return
+		return *new(T), err
 	}
 
 	if v, ok := data.(T); ok {
-		value = v
+		return v, nil
 	}
 
-	return
+	return *new(T), nil
 }
-
